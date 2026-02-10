@@ -1,7 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
-
-const TOKEN = "5tmYwcYrAFrmrM0G4zOmjpcUifQjyRuf";
-const VPIN = { RELAY: "V1", BUZZER: "V2", STEP: "V4", TEMP: "V6" };
+import { useEffect, useState } from "react";
+import { ref, onValue, set } from "firebase/database";
+import { db } from "../firebase";
 
 export default function Home({ user }) {
   const [steps, setSteps] = useState(0);
@@ -10,126 +9,89 @@ export default function Home({ user }) {
   const [buzzer, setBuzzer] = useState(0);
   const [toast, setToast] = useState(false);
 
-  /* ================= BLYNK ================= */
-  const apiGet = (pin, cb) => {
-    fetch(`https://blynk.cloud/external/api/get?token=${TOKEN}&${pin}`)
-      .then((r) => r.text())
-      .then((d) => cb(Number(d)));
-  };
+  /* ================= FIREBASE READ ================= */
+  useEffect(() => {
+    const dataRef = ref(db, "sos/smartshoes");
 
-  const apiSet = (pin, val) => {
-    fetch(
-      `https://blynk.cloud/external/api/update?token=${TOKEN}&${pin}=${val}`
-    );
-  };
+    const unsub = onValue(dataRef, (snap) => {
+      const d = snap.val();
+      if (!d) return;
 
-  const refresh = useCallback(() => {
-    apiGet(VPIN.STEP, (d) => setSteps(d));
-    apiGet(VPIN.TEMP, (c) => {
-      let f = (c * 9) / 5 + 32;
-      setTemp(f.toFixed(1));
+      setSteps(d.steps ?? 0);
+      setTemp(((d.temperature * 9) / 5 + 32).toFixed(1));
+      setRelay(d.relay ?? 0);
+      setBuzzer(d.buzzer ?? 0);
     });
-    apiGet(VPIN.RELAY, (d) => setRelay(d));
-    apiGet(VPIN.BUZZER, (d) => setBuzzer(d));
+
+    return () => unsub();
   }, []);
 
-  useEffect(() => {
-    refresh();
-    const t = setInterval(refresh, 2000);
-    return () => clearInterval(t);
-  }, [refresh]);
-
+  /* ================= FIREBASE WRITE ================= */
   const triggerRelay = () => {
-    setRelay(1);
-    apiSet(VPIN.RELAY, 1);
+    set(ref(db, "smartshoes/relay"), 1);
     setToast(true);
+
     setTimeout(() => {
-      setRelay(0);
-      apiSet(VPIN.RELAY, 0);
+      set(ref(db, "smartshoes/relay"), 0);
       setToast(false);
     }, 5000);
   };
 
   const toggleBuzzer = () => {
-    const v = buzzer ? 0 : 1;
-    setBuzzer(v);
-    apiSet(VPIN.BUZZER, v);
+    set(ref(db, "smartshoes/buzzer"), buzzer ? 0 : 1);
   };
 
-  /* ================= EMERGENCY HELP ================= */
-
+  /* ================= EMERGENCY ================= */
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   const getLocationAndSendSMS = (type) => {
     if (!isMobile) {
-      alert("📱 Emergency SMS works only on mobile phones.");
+      alert("📱 Emergency SMS works only on mobile phones");
       return;
     }
 
-    if (!navigator.geolocation) {
-      alert("Location not supported");
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-
-        const mapLink = `https://maps.google.com/?q=${lat},${lng}`;
-
-        let number = "";
-        let message = "";
-
-        if (type === "police") {
-          number = "112";
-          message =
-            `🚨 EMERGENCY ALERT 🚨\n` +
-            `A person is in danger.\n\n` +
-            `📍 Location:\n${mapLink}`;
-        }
-
-        if (type === "ambulance") {
-          number = "108";
-          message =
-            `🚑 MEDICAL EMERGENCY 🚑\n\n` +
-            `📍 Location:\n${mapLink}`;
-        }
-
-        window.location.href =
-          `sms:${number}?body=${encodeURIComponent(message)}`;
-      },
-      () => {
-        alert("Location permission denied");
-      }
-    );
-  };
-
-  const sendPoliceAlert = () => getLocationAndSendSMS("police");
-  const sendAmbulanceAlert = () => getLocationAndSendSMS("ambulance");
-
-  /* ================= NEARBY MAP SEARCH ================= */
-
-  const openNearbyPoliceStation = () => {
-    if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition((pos) => {
       const { latitude, longitude } = pos.coords;
-      const url = `https://www.google.com/maps/search/police+station/@${latitude},${longitude},15z`;
-      window.open(url, "_blank");
+      const mapLink = `https://maps.google.com/?q=${latitude},${longitude}`;
+
+      let number = "";
+      let msg = "";
+
+      if (type === "police") {
+        number = "112";
+        msg = `🚨 EMERGENCY ALERT 🚨\n\n📍 Location:\n${mapLink}`;
+      }
+
+      if (type === "ambulance") {
+        number = "108";
+        msg = `🚑 MEDICAL EMERGENCY 🚑\n\n📍 Location:\n${mapLink}`;
+      }
+
+      window.location.href = `sms:${number}?body=${encodeURIComponent(msg)}`;
+    });
+  };
+
+  const openNearbyPoliceStation = () => {
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const { latitude, longitude } = pos.coords;
+      window.open(
+        `https://www.google.com/maps/search/police+station/@${latitude},${longitude},15z`,
+        "_blank"
+      );
     });
   };
 
   const openNearbyHospital = () => {
-    if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition((pos) => {
       const { latitude, longitude } = pos.coords;
-      const url = `https://www.google.com/maps/search/hospital/@${latitude},${longitude},15z`;
-      window.open(url, "_blank");
+      window.open(
+        `https://www.google.com/maps/search/hospital/@${latitude},${longitude},15z`,
+        "_blank"
+      );
     });
   };
 
   /* ================= UI ================= */
-
   return (
     <>
       <div className="header">
@@ -146,56 +108,33 @@ export default function Home({ user }) {
           <model-viewer
             src="https://modelviewer.dev/shared-assets/models/Astronaut.glb"
             camera-controls
-          ></model-viewer>
+          />
         </div>
       </div>
 
       {toast && <div className="toast">⚡ RELAY ON (5s)</div>}
 
       <div className="grid">
-        {/* EMERGENCY */}
         <div className="card full">
           <div className="label">🚨 Emergency Assistance</div>
 
-          <button
-            style={{ background: "linear-gradient(135deg,#ef4444,#dc2626)" }}
-            onClick={sendPoliceAlert}
-          >
-            🚓 Send SOS to Police (SMS)
+          <button onClick={() => getLocationAndSendSMS("police")}>
+            🚓 SOS Police
           </button>
 
-          <button
-            style={{
-              background: "linear-gradient(135deg,#22c55e,#16a34a)",
-              marginTop: 10,
-            }}
-            onClick={sendAmbulanceAlert}
-          >
-            🚑 Send SOS to Ambulance (SMS)
+          <button onClick={() => getLocationAndSendSMS("ambulance")}>
+            🚑 SOS Ambulance
           </button>
 
-          <button
-            style={{
-              background: "linear-gradient(135deg,#2563eb,#1d4ed8)",
-              marginTop: 10,
-            }}
-            onClick={openNearbyPoliceStation}
-          >
-            🏢 Open Nearby Police Station
+          <button onClick={openNearbyPoliceStation}>
+            🏢 Nearby Police Station
           </button>
 
-          <button
-            style={{
-              background: "linear-gradient(135deg,#0ea5e9,#0369a1)",
-              marginTop: 10,
-            }}
-            onClick={openNearbyHospital}
-          >
-            🏥 Open Nearby Hospital
+          <button onClick={openNearbyHospital}>
+            🏥 Nearby Hospital
           </button>
         </div>
 
-        {/* DATA */}
         <div className="card">
           <div className="label">Temperature</div>
           <div className="value">{temp} °F</div>
@@ -211,7 +150,7 @@ export default function Home({ user }) {
           <div
             className={`switch ${relay ? "on" : ""}`}
             onClick={triggerRelay}
-          ></div>
+          />
         </div>
 
         <div className="card full">
@@ -219,7 +158,7 @@ export default function Home({ user }) {
           <div
             className={`switch ${buzzer ? "on" : ""}`}
             onClick={toggleBuzzer}
-          ></div>
+          />
         </div>
       </div>
     </>

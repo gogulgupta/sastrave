@@ -1,141 +1,109 @@
 import { useEffect, useRef, useState } from "react";
-
-const TOKEN = "Fy9DrMSPlw60Kq42yxmO-5CBU0iqRfKN";
-
-// Blynk virtual pins
-const VPIN = {
-  VALID: "V7",
-  DIST: "V8",   // cm
-  ANGLE: "V9"   // degree
-};
+import { ref, onValue } from "firebase/database";
+import { db } from "../firebase";
 
 export default function Radar() {
   const canvasRef = useRef(null);
 
-  const [distance, setDistance] = useState(0);
-  const [angle, setAngle] = useState(0);
+  const [distance, setDistance] = useState(0); // cm
+  const [angle, setAngle] = useState(0);       // deg
+  const [valid, setValid] = useState(0);
 
   const maxRange = 500; // cm
 
-  /* ================= BLYNK READ ================= */
-  const apiGet = async (pin) => {
-    const r = await fetch(
-      `https://blynk.cloud/external/api/get?token=${TOKEN}&${pin}`
-    );
-    return Number(await r.text());
-  };
+  /* ================= FIREBASE READ ================= */
+  useEffect(() => {
+    const radarRef = ref(db, "smartshoes/radar");
 
-  const fetchRadarData = async () => {
-    const valid = await apiGet(VPIN.VALID);
-    if (valid === 1) {
-      setDistance(await apiGet(VPIN.DIST));
-      setAngle(await apiGet(VPIN.ANGLE));
-    } else {
-      setDistance(0);
-      setAngle(0);
-    }
-  };
+    const unsub = onValue(radarRef, (snap) => {
+      const d = snap.val();
+      if (!d) return;
 
-  /* ================= DRAW RADAR ================= */
-  const drawRadar = (ctx, w, h) => {
-    // background
-    ctx.fillStyle = "black";
-    ctx.fillRect(0, 0, w, h);
+      setValid(d.valid ?? 0);
+      setDistance(d.distance ?? 0);
+      setAngle(d.angle ?? 0);
+    });
 
-    const cx = w / 2;
-    const cy = h - 10;
-    const scale = (w / 2 - 20) / maxRange;
+    return () => unsub();
+  }, []);
 
-    ctx.strokeStyle = "#00ff44";
-    ctx.lineWidth = 2;
-    ctx.font = "14px monospace";
-    ctx.fillStyle = "#00ff44";
-
-    /* RANGE CIRCLES (1m – 5m) */
-    for (let i = 1; i <= 5; i++) {
-      ctx.beginPath();
-      ctx.arc(cx, cy, i * 100 * scale, Math.PI, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.fillText(
-        i + "m",
-        cx - 14,
-        cy - i * 100 * scale - 4
-      );
-    }
-
-    /* GRID LINES */
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx, cy - maxRange * scale);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(cx - maxRange * scale, cy);
-    ctx.lineTo(cx + maxRange * scale, cy);
-    ctx.stroke();
-
-    /* ORIGIN DOT */
-    ctx.fillStyle = "#00ff44";
-    ctx.beginPath();
-    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-    ctx.fill();
-
-    /* TARGET DOT */
-    if (distance > 0 && distance <= maxRange) {
-      const rad = (angle * Math.PI) / 180;
-      const tx = cx + Math.cos(rad) * distance * scale;
-      const ty = cy - Math.sin(rad) * distance * scale;
-
-      ctx.fillStyle = "red";
-      ctx.beginPath();
-      ctx.arc(tx, ty, 6, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    /* TELEMETRY TEXT */
-    ctx.fillStyle = "#00ff44";
-    ctx.fillText(
-      "Distance: " + (distance / 100).toFixed(2) + " m",
-      12,
-      22
-    );
-    ctx.fillText(
-      "Angle: " + angle.toFixed(1) + "°",
-      12,
-      42
-    );
-  };
-
-  /* ================= LOOP ================= */
+  /* ================= DRAW ================= */
   useEffect(() => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
+
     const ctx = canvas.getContext("2d");
+    canvas.width = 300;
+    canvas.height = 300;
 
-    const loop = () => {
-      drawRadar(ctx, canvas.width, canvas.height);
-      requestAnimationFrame(loop);
+    const cx = 150;
+    const cy = 150;
+    const scale = (140) / maxRange;
+
+    const draw = () => {
+      // background
+      ctx.fillStyle = "#020617";
+      ctx.fillRect(0, 0, 300, 300);
+
+      ctx.strokeStyle = "#00ff66";
+      ctx.lineWidth = 2;
+      ctx.font = "12px monospace";
+      ctx.fillStyle = "#00ff66";
+
+      // circles (1m–5m)
+      for (let r = 100; r <= 500; r += 100) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * scale, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillText(`${r / 100}m`, cx - 12, cy - r * scale - 4);
+      }
+
+      // cross lines
+      ctx.beginPath();
+      ctx.moveTo(cx, 0);
+      ctx.lineTo(cx, 300);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(0, cy);
+      ctx.lineTo(300, cy);
+      ctx.stroke();
+
+      // target
+      if (valid === 1 && distance > 0) {
+        const rad = (angle * Math.PI) / 180;
+        const x = cx + Math.cos(rad) * distance * scale;
+        const y = cy - Math.sin(rad) * distance * scale;
+
+        ctx.fillStyle = "red";
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      requestAnimationFrame(draw);
     };
-    loop();
 
-    const t = setInterval(fetchRadarData, 200);
-    return () => clearInterval(t);
-  }, [distance, angle]);
+    draw();
+  }, [distance, angle, valid]);
 
   return (
-    <>
+    <div style={{ textAlign: "center" }}>
       <h2>🟢 Radar Scan</h2>
 
       <canvas
         ref={canvasRef}
-        width={360}
-        height={300}
         style={{
-          borderRadius: "18px",
-          boxShadow: "0 0 30px #00ff4444",
-          border: "2px solid #00ff44"
+          border: "2px solid #00ff66",
+          borderRadius: "14px",
+          boxShadow: "0 0 30px #00ff6633"
         }}
       />
-    </>
+
+      <div style={{ marginTop: 10, color: "#00ff66" }}>
+        Distance: {(distance / 100).toFixed(2)} m<br />
+        Angle: {angle.toFixed(1)}°
+      </div>
+    </div>
   );
 }
