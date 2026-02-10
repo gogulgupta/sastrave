@@ -56,6 +56,58 @@ export default function Home({ user }) {
     setBuzzer(v);
     apiSet(VPIN.BUZZER, v);
   };
+// ================= EMERGENCY HELP =================
+
+const getLocationAndSendSMS = (type) => {
+  if (!navigator.geolocation) {
+    alert("Location not supported");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+
+      const mapLink = `https://maps.google.com/?q=${lat},${lng}`;
+
+      let number = "";
+      let message = "";
+
+      if (type === "police") {
+        number = "112"; // India Police / Emergency
+        message =
+          `🚨 EMERGENCY ALERT 🚨\n` +
+          `A person is in danger.\n` +
+          `Please contact immediately.\n\n` +
+          `📍 Location:\n${mapLink}`;
+      }
+
+      if (type === "ambulance") {
+        number = "108"; // India Ambulance
+        message =
+          `🚑 MEDICAL EMERGENCY 🚑\n` +
+          `Immediate medical help required.\n\n` +
+          `📍 Location:\n${mapLink}`;
+      }
+
+      // Open SMS app with message
+      window.location.href =
+        `sms:${number}?body=${encodeURIComponent(message)}`;
+    },
+    () => {
+      alert("Location permission denied");
+    }
+  );
+};
+
+const sendPoliceAlert = () => {
+  getLocationAndSendSMS("police");
+};
+
+const sendAmbulanceAlert = () => {
+  getLocationAndSendSMS("ambulance");
+};
 
   return (
     <>
@@ -64,7 +116,7 @@ export default function Home({ user }) {
         <div className="user-name">
           {user && "Welcome, " + (user.displayName || user.email)}
         </div>
-        <div className="goal">87%</div>
+        <div className="goal">89%</div>
         <div className="sub">Daily Goal</div>
       </div>
 
@@ -80,6 +132,23 @@ export default function Home({ user }) {
       {toast && <div className="toast">⚡ RELAY ON (5s)</div>}
 
       <div className="grid">
+        <div className="card full">
+    <div className="label">🚨 Emergency Assistance</div>
+
+    <button
+      style={{ background: "linear-gradient(135deg,#ef4444,#dc2626)" }}
+      onClick={sendPoliceAlert}
+    >
+      🚓 Alert Nearby Police
+    </button>
+
+    <button
+      style={{ background: "linear-gradient(135deg,#22c55e,#16a34a)", marginTop: 10 }}
+      onClick={sendAmbulanceAlert}
+    >
+      🚑 Call Ambulance
+    </button>
+  </div>
         <div className="card">
           <div className="label">Temperature</div>
           <div className="value">{temp} °F</div>

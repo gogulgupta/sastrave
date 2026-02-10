@@ -2,6 +2,7 @@ import { useState } from "react";
 import "./App.css";
 import Home from "./components/Home";
 import Location from "./components/Location";
+import Radar from "./components/Radar";
 import Decrypt from "./components/Decrypt";
 import Login from "./components/Login";
 
@@ -21,6 +22,7 @@ export default function App() {
       <div className="bottom-bar">
         <div className={`nav-btn ${panel === "home" ? "active" : ""}`} onClick={() => setPanel("home")}>🏠</div>
         <div className={`nav-btn ${panel === "loc" ? "active" : ""}`} onClick={() => setPanel("loc")}>📍</div>
+        <div className={`nav-btn ${panel==="radar"?"active":""}`} onClick={()=>setPanel("radar")}>🟢</div>
         <div className={`nav-btn ${panel === "dec" ? "active" : ""}`} onClick={() => setPanel("dec")}>🔒</div>
         <div className={`nav-btn ${panel === "login" ? "active" : ""}`} onClick={() => setPanel("login")}>👤</div>
       </div>
