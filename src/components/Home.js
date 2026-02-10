@@ -10,6 +10,7 @@ export default function Home({ user }) {
   const [buzzer, setBuzzer] = useState(0);
   const [toast, setToast] = useState(false);
 
+  /* ================= BLYNK ================= */
   const apiGet = (pin, cb) => {
     fetch(`https://blynk.cloud/external/api/get?token=${TOKEN}&${pin}`)
       .then((r) => r.text())
@@ -22,7 +23,6 @@ export default function Home({ user }) {
     );
   };
 
-  // ✅ FIX: refresh wrapped in useCallback
   const refresh = useCallback(() => {
     apiGet(VPIN.STEP, (d) => setSteps(d));
     apiGet(VPIN.TEMP, (c) => {
@@ -33,7 +33,6 @@ export default function Home({ user }) {
     apiGet(VPIN.BUZZER, (d) => setBuzzer(d));
   }, []);
 
-  // ✅ FIX: refresh added to dependency
   useEffect(() => {
     refresh();
     const t = setInterval(refresh, 2000);
@@ -56,58 +55,80 @@ export default function Home({ user }) {
     setBuzzer(v);
     apiSet(VPIN.BUZZER, v);
   };
-// ================= EMERGENCY HELP =================
 
-const getLocationAndSendSMS = (type) => {
-  if (!navigator.geolocation) {
-    alert("Location not supported");
-    return;
-  }
+  /* ================= EMERGENCY HELP ================= */
 
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-      const mapLink = `https://maps.google.com/?q=${lat},${lng}`;
-
-      let number = "";
-      let message = "";
-
-      if (type === "police") {
-        number = "112"; // India Police / Emergency
-        message =
-          `🚨 EMERGENCY ALERT 🚨\n` +
-          `A person is in danger.\n` +
-          `Please contact immediately.\n\n` +
-          `📍 Location:\n${mapLink}`;
-      }
-
-      if (type === "ambulance") {
-        number = "108"; // India Ambulance
-        message =
-          `🚑 MEDICAL EMERGENCY 🚑\n` +
-          `Immediate medical help required.\n\n` +
-          `📍 Location:\n${mapLink}`;
-      }
-
-      // Open SMS app with message
-      window.location.href =
-        `sms:${number}?body=${encodeURIComponent(message)}`;
-    },
-    () => {
-      alert("Location permission denied");
+  const getLocationAndSendSMS = (type) => {
+    if (!isMobile) {
+      alert("📱 Emergency SMS works only on mobile phones.");
+      return;
     }
-  );
-};
 
-const sendPoliceAlert = () => {
-  getLocationAndSendSMS("police");
-};
+    if (!navigator.geolocation) {
+      alert("Location not supported");
+      return;
+    }
 
-const sendAmbulanceAlert = () => {
-  getLocationAndSendSMS("ambulance");
-};
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+
+        const mapLink = `https://maps.google.com/?q=${lat},${lng}`;
+
+        let number = "";
+        let message = "";
+
+        if (type === "police") {
+          number = "112";
+          message =
+            `🚨 EMERGENCY ALERT 🚨\n` +
+            `A person is in danger.\n\n` +
+            `📍 Location:\n${mapLink}`;
+        }
+
+        if (type === "ambulance") {
+          number = "108";
+          message =
+            `🚑 MEDICAL EMERGENCY 🚑\n\n` +
+            `📍 Location:\n${mapLink}`;
+        }
+
+        window.location.href =
+          `sms:${number}?body=${encodeURIComponent(message)}`;
+      },
+      () => {
+        alert("Location permission denied");
+      }
+    );
+  };
+
+  const sendPoliceAlert = () => getLocationAndSendSMS("police");
+  const sendAmbulanceAlert = () => getLocationAndSendSMS("ambulance");
+
+  /* ================= NEARBY MAP SEARCH ================= */
+
+  const openNearbyPoliceStation = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const { latitude, longitude } = pos.coords;
+      const url = `https://www.google.com/maps/search/police+station/@${latitude},${longitude},15z`;
+      window.open(url, "_blank");
+    });
+  };
+
+  const openNearbyHospital = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const { latitude, longitude } = pos.coords;
+      const url = `https://www.google.com/maps/search/hospital/@${latitude},${longitude},15z`;
+      window.open(url, "_blank");
+    });
+  };
+
+  /* ================= UI ================= */
 
   return (
     <>
@@ -132,23 +153,49 @@ const sendAmbulanceAlert = () => {
       {toast && <div className="toast">⚡ RELAY ON (5s)</div>}
 
       <div className="grid">
+        {/* EMERGENCY */}
         <div className="card full">
-    <div className="label">🚨 Emergency Assistance</div>
+          <div className="label">🚨 Emergency Assistance</div>
 
-    <button
-      style={{ background: "linear-gradient(135deg,#ef4444,#dc2626)" }}
-      onClick={sendPoliceAlert}
-    >
-      🚓 Alert Nearby Police
-    </button>
+          <button
+            style={{ background: "linear-gradient(135deg,#ef4444,#dc2626)" }}
+            onClick={sendPoliceAlert}
+          >
+            🚓 Send SOS to Police (SMS)
+          </button>
 
-    <button
-      style={{ background: "linear-gradient(135deg,#22c55e,#16a34a)", marginTop: 10 }}
-      onClick={sendAmbulanceAlert}
-    >
-      🚑 Call Ambulance
-    </button>
-  </div>
+          <button
+            style={{
+              background: "linear-gradient(135deg,#22c55e,#16a34a)",
+              marginTop: 10,
+            }}
+            onClick={sendAmbulanceAlert}
+          >
+            🚑 Send SOS to Ambulance (SMS)
+          </button>
+
+          <button
+            style={{
+              background: "linear-gradient(135deg,#2563eb,#1d4ed8)",
+              marginTop: 10,
+            }}
+            onClick={openNearbyPoliceStation}
+          >
+            🏢 Open Nearby Police Station
+          </button>
+
+          <button
+            style={{
+              background: "linear-gradient(135deg,#0ea5e9,#0369a1)",
+              marginTop: 10,
+            }}
+            onClick={openNearbyHospital}
+          >
+            🏥 Open Nearby Hospital
+          </button>
+        </div>
+
+        {/* DATA */}
         <div className="card">
           <div className="label">Temperature</div>
           <div className="value">{temp} °F</div>
