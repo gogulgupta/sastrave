@@ -61,7 +61,7 @@ export default function Location(){
       <div className="location-header">
         <h2 className="location-title">
           <span className="icon-wrapper">📍</span>
-          GEOLOCATION SYSTEM
+          LOCATION SYSTEM
         </h2>
         <p className="location-subtitle">GPS TRACKING</p>
       </div>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ESP32 Z44N Controller</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .container {
+      width: 360px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 15px;
+      padding: 25px;
+      box-shadow: 0 0 25px rgba(0,0,0,0.5);
+      text-align: center;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+      font-size: 22px;
+    }
+
+    .status {
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+    }
+
+    button {
+      padding: 15px;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      background: #00c6ff;
+      color: #000;
+      font-weight: bold;
+      transition: 0.2s;
+    }
+
+    button:hover {
+      background: #00ffcc;
+      transform: scale(1.05);
+    }
+
+    .footer {
+      margin-top: 20px;
+      font-size: 12px;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>ESP32 Z44N Control</h1>
+  <div class="status" id="status">🔴 Connecting...</div>
+
+  <div class="grid">
+    <button onclick="sendCmd(1)">Motor 1</button>
+    <button onclick="sendCmd(2)">Motor 2</button>
+    <button onclick="sendCmd(3)">Motor 3</button>
+    <button onclick="sendCmd(4)">Motor 4</button>
+    <button onclick="sendCmd(5)">Motor 5</button>
+    <button onclick="sendCmd(6)">Motor 6</button>
+  </div>
+
+  <div class="footer">
+    HiveMQ Cloud • Secure MQTT
+  </div>
+</div>
+
+<script>
+  const options = {
+    protocol: 'wss',
+    hostname: '46d42450cb90438584d4ace7a376bcda.s1.eu.hivemq.cloud',
+    port: 8884,
+    username: 'tapish',
+    password: 'Tapish@12345678',
+    path: '/mqtt'
+  };
+
+  const topic = 'esp32/z44n/control';
+  const statusEl = document.getElementById('status');
+
+  const client = mqtt.connect(options);
+
+  client.on('connect', () => {
+    statusEl.innerHTML = '🟢 Connected to HiveMQ';
+  });
+
+  client.on('error', (err) => {
+    statusEl.innerHTML = '🔴 Connection Error';
+    console.error(err);
+  });
+
+  function sendCmd(cmd) {
+    client.publish(topic, String(cmd));
+    console.log('Sent:', cmd);
+  }
+</script>
+
+</body>
+</html>

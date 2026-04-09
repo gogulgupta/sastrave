@@ -127,7 +127,7 @@ export default function Login({setUser, setPanel}) {
               </svg>
             </div>
           </div>
-          <h1 className="login-title">Hybrid Smart Shoes</h1>
+          <h1 className="login-title">Sastraved Shoes</h1>
           <p className="login-subtitle">Enter the future of footwear technology</p>
         </div>
 
